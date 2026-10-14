@@ -1,0 +1,83 @@
+# =====================================================================
+# dvc.yaml - Pipeline reproducible (B.2.2)
+# ---------------------------------------------------------------------
+# "dvc repro" ejecuta el pipeline completo en orden:
+#   ingest -> preparar -> entrenar -> evaluar
+# Cada etapa declara sus dependencias y salidas; DVC solo re-ejecuta lo
+# que cambió. Los parámetros se leen de params.yaml (sección 'params').
+# =====================================================================
+
+stages:
+  ingest:
+    desc: "A.3.1 Construye el panel modelable (rezagos + objetivo) desde la fuente"
+    cmd: python -m src.ingest
+    deps:
+      - src/ingest.py
+      - src/config.py
+      - data/external/crime_state_year.csv
+    params:
+      - semilla
+      - datos
+    outs:
+      - data/raw/crime_panel.csv
+
+  preparar:
+    desc: "A.3.2/A.3.4 Valida y divide en train/test (semilla fija)"
+    cmd: python -m src.data
+    deps:
+      - src/data.py
+      - src/validate.py
+      - src/preprocess.py
+      - src/config.py
+      - data/raw/crime_panel.csv
+    params:
+      - semilla
+      - split
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  entrenar:
+    desc: "A.4/A.5/A.8/A.9 Entrena, compara, optimiza, serializa y registra en MLflow"
+    cmd: python -m src.train
+    deps:
+      - src/train.py
+      - src/modelos.py
+      - src/preprocess.py
+      - src/metricas.py
+      - src/config.py
+      - config/business.yaml
+      - data/processed/train.csv
+      - data/processed/test.csv
+    params:
+      - semilla
+      - cv
+      - optimizacion
+      - modelos
+    outs:
+      - models/model.joblib
+      - models/model_meta.json
+      - reports/comparacion.csv:
+          cache: false
+
+  evaluar:
+    desc: "A.6 Métricas y gráficos del modelo seleccionado"
+    cmd: python -m src.evaluate
+    deps:
+      - src/evaluate.py
+      - src/metricas.py
+      - src/preprocess.py
+      - src/config.py
+      - config/business.yaml
+      - models/model.joblib
+      - data/processed/test.csv
+    metrics:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/figures/matriz_confusion.png:
+          cache: false
+      - reports/figures/curva_roc.png:
+          cache: false
+      - reports/figures/curva_pr.png:
+          cache: false
