@@ -164,3 +164,7 @@ Modelo seleccionado: Random Forest.
 | Recall | 0.652 |
 
 Ver `reports/` para la tabla de comparación completa y los gráficos.
+
+## Licencia y fuente de los datos
+Dataset: CrimeBase — estadisticas de criminalidad de la NCRB (National Crime Records Bureau, Government of India), obtenido via Kaggle.
+Licencia: ver la pagina del dataset en Kaggle (datos gubernamentales de acceso abierto). Indicar aqui la licencia exacta que muestre Kaggle (por ejemplo "CC0: Public Domain" u "Other").
