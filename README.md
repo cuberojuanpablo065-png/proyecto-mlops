@@ -151,3 +151,16 @@ corren sin necesidad de descargar los datos.
 | A.8 Serialización + prueba de carga | `src/train.py` (joblib) + `tests/test_serializacion.py` |
 | A.9 Seguimiento con MLflow | `src/train.py` (params, métricas, modelo, commit) |
 | B.1/B.2/B.3 Versionamiento y entrega | ver `GUIA_ENTREGA.md` |
+
+## Resultados obtenidos
+
+Modelo seleccionado: Random Forest.
+
+| Métrica | Valor |
+|---|---|
+| F1 | 0.658 |
+| ROC-AUC | 0.757 |
+| Precision | 0.665 |
+| Recall | 0.652 |
+
+Ver `reports/` para la tabla de comparación completa y los gráficos.
