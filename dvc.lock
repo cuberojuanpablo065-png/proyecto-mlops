@@ -21,20 +21,20 @@ stages:
           fuente_externa: data/external/crime_state_year.csv
           archivo_crudo: data/raw/crime_panel.csv
           metrica_fuente: cases_registered
-          anio_corte_v1: 2019
+          anio_corte_v1: 2022
         semilla: 42
     outs:
     - path: data/raw/crime_panel.csv
       hash: md5
-      md5: d8664b1a120716344b739cfa3adfddc5
-      size: 5092703
+      md5: 825b79692c1730e2e917ee9c85beb5a5
+      size: 10645582
   preparar:
     cmd: python -m src.data
     deps:
     - path: data/raw/crime_panel.csv
       hash: md5
-      md5: d8664b1a120716344b739cfa3adfddc5
-      size: 5092703
+      md5: 825b79692c1730e2e917ee9c85beb5a5
+      size: 10645582
     - path: src/config.py
       hash: md5
       md5: e36cc244f2ec2f9471f43541705bf9df
@@ -61,12 +61,12 @@ stages:
     outs:
     - path: data/processed/test.csv
       hash: md5
-      md5: f0ab8f4c07359a308eb99cedb8aa6005
-      size: 1011776
+      md5: cab6b706411e1706c7b8075d7a6123bf
+      size: 2132573
     - path: data/processed/train.csv
       hash: md5
-      md5: bcac48171d18fff1c730ce635f71148e
-      size: 4063424
+      md5: b3e5a955cf8bc4f079652364a0c72344
+      size: 8486701
   entrenar:
     cmd: python -m src.train
     deps:
@@ -76,12 +76,12 @@ stages:
       size: 2566
     - path: data/processed/test.csv
       hash: md5
-      md5: f0ab8f4c07359a308eb99cedb8aa6005
-      size: 1011776
+      md5: cab6b706411e1706c7b8075d7a6123bf
+      size: 2132573
     - path: data/processed/train.csv
       hash: md5
-      md5: bcac48171d18fff1c730ce635f71148e
-      size: 4063424
+      md5: b3e5a955cf8bc4f079652364a0c72344
+      size: 8486701
     - path: src/config.py
       hash: md5
       md5: e36cc244f2ec2f9471f43541705bf9df
@@ -151,15 +151,15 @@ stages:
     outs:
     - path: models/model.joblib
       hash: md5
-      md5: 5b30b298122cb24639f44a2a999c8d1e
-      size: 415633467
+      md5: 1743a4c9dd447b1c0387155a7811eff6
+      size: 703422283
     - path: models/model_meta.json
       hash: md5
-      md5: 0182fe225abb893905a297c52dd80fb5
+      md5: 88661188c62c5438cc83ef647ed7cd5f
       size: 378
     - path: reports/comparacion.csv
       hash: md5
-      md5: 2b54230313d0e8dcb351c8b0b8f241ae
+      md5: c07781a14d582abaeaa21a4f49b11a42
       size: 397
   evaluar:
     cmd: python -m src.evaluate
@@ -170,12 +170,12 @@ stages:
       size: 2566
     - path: data/processed/test.csv
       hash: md5
-      md5: f0ab8f4c07359a308eb99cedb8aa6005
-      size: 1011776
+      md5: cab6b706411e1706c7b8075d7a6123bf
+      size: 2132573
     - path: models/model.joblib
       hash: md5
-      md5: 5b30b298122cb24639f44a2a999c8d1e
-      size: 415633467
+      md5: 1743a4c9dd447b1c0387155a7811eff6
+      size: 703422283
     - path: src/config.py
       hash: md5
       md5: e36cc244f2ec2f9471f43541705bf9df
@@ -195,17 +195,17 @@ stages:
     outs:
     - path: reports/figures/curva_pr.png
       hash: md5
-      md5: 89fa38a93ec781b431e52b179815b806
-      size: 34950
+      md5: 3b5a2b7fbaf2cd511896b93f32945ce6
+      size: 35274
     - path: reports/figures/curva_roc.png
       hash: md5
-      md5: a219d0ef4512348d67d5c3d0ca8b609d
-      size: 37381
+      md5: 37166a5d89bb4fadd17e42afe7daf720
+      size: 37553
     - path: reports/figures/matriz_confusion.png
       hash: md5
-      md5: df5e000098d9f9b8b7fd3edceb054b48
-      size: 19858
+      md5: 0a51885ea16aeed61926a04ae1153b1f
+      size: 20143
     - path: reports/metrics.json
       hash: md5
-      md5: da8e96add91259a2abbfc2222524a651
-      size: 491
+      md5: b94613a20b8693fbdd89fbf6b5601bd4
+      size: 485

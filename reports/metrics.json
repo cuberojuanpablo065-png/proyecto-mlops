@@ -1,26 +1,26 @@
 {
   "metrica_principal": "f1",
-  "valor_metrica_principal": 0.6584257791864765,
+  "valor_metrica_principal": 0.66229633401222,
   "metricas": {
-    "accuracy": 0.6814778325123153,
-    "precision": 0.6646757679180887,
-    "recall": 0.6522922336194265,
-    "f1": 0.6584257791864765,
-    "roc_auc": 0.7572159014160732,
-    "pr_auc": 0.7448482309274196
+    "accuracy": 0.6900700934579439,
+    "precision": 0.6606984126984127,
+    "recall": 0.663902003317596,
+    "f1": 0.66229633401222,
+    "roc_auc": 0.7590574963700434,
+    "pr_auc": 0.734803186871409
   },
   "umbral_optimo_por_costo": {
-    "umbral": 0.15,
-    "costo_esperado": 5037.0
+    "umbral": 0.18,
+    "costo_esperado": 8763.0
   },
   "matriz_confusion": [
     [
-      3801,
-      1572
+      6611,
+      2672
     ],
     [
-      1661,
-      3116
+      2634,
+      5203
     ]
   ]
 }

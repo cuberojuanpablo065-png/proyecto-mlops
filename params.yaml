@@ -17,7 +17,7 @@ datos:
   metrica_fuente: cases_registered  # solo filas de casos registrados
   # Para el versionamiento de datos (B.2.3) y el drift (Entregable 3):
   # la versión 1 usa años <= anio_corte_v1; la v2 (--simular-v2) usa todos.
-  anio_corte_v1: 2019
+  anio_corte_v1: 2022
 
 split:
   test_size: 0.2
