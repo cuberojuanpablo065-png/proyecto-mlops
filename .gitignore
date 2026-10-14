@@ -1,0 +1,43 @@
+# =====================================================================
+# .gitignore (B.1.4) - A Git NO van: datos, modelos, entornos ni
+# credenciales. Los datos/modelos se gestionan con DVC y MLflow.
+# =====================================================================
+
+# --- Datos y modelos (gestionados por DVC / MLflow) ---
+# Se ignora el contenido pero se conservan los .dvc y .gitkeep.
+/data/external/*
+/data/raw/*
+/data/processed/*
+/models/*
+!*.dvc
+!**/.gitkeep
+
+# --- MLflow ---
+mlruns/
+mlartifacts/
+
+# --- Entornos virtuales ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Credenciales / secretos ---
+.env
+*.key
+*.pem
+credentials.json
+secrets.yaml
+
+# --- Sistema operativo / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

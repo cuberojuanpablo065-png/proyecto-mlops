@@ -1,0 +1,3 @@
+# Patrones que DVC debe ignorar al rastrear directorios.
+*.tmp
+__pycache__/
