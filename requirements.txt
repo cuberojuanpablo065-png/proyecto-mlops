@@ -1,0 +1,29 @@
+# Dependencias del proyecto.
+# Se usan versiones mínimas (>=) para ser compatibles con Python 3.11–3.14.
+#
+# Instalación:
+#   python3 -m venv .venv
+#   source .venv/bin/activate      # Linux / WSL / macOS
+#   pip install -r requirements.txt
+
+# --- Datos y modelos ---
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.5
+joblib>=1.3
+
+# --- Validación de datos ---
+pandera>=0.20
+
+# --- Seguimiento de experimentos y versionamiento de datos ---
+mlflow>=2.17
+dvc>=3.50
+
+# --- Gráficos ---
+matplotlib>=3.8
+
+# --- Configuración ---
+PyYAML>=6.0
+
+# --- Pruebas ---
+pytest>=8.0
