@@ -1,0 +1,211 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: python -m src.ingest
+    deps:
+    - path: data/external/crime_state_year.csv
+      hash: md5
+      md5: 1fa566b6ef69572fafdda0d8f5f90913
+      size: 80734668
+    - path: src/config.py
+      hash: md5
+      md5: e36cc244f2ec2f9471f43541705bf9df
+      size: 1508
+    - path: src/ingest.py
+      hash: md5
+      md5: 1e7baa1faa7284db2a8e6b6c468b801e
+      size: 3888
+    params:
+      params.yaml:
+        datos:
+          fuente_externa: data/external/crime_state_year.csv
+          archivo_crudo: data/raw/crime_panel.csv
+          metrica_fuente: cases_registered
+          anio_corte_v1: 2019
+        semilla: 42
+    outs:
+    - path: data/raw/crime_panel.csv
+      hash: md5
+      md5: d8664b1a120716344b739cfa3adfddc5
+      size: 5092703
+  preparar:
+    cmd: python -m src.data
+    deps:
+    - path: data/raw/crime_panel.csv
+      hash: md5
+      md5: d8664b1a120716344b739cfa3adfddc5
+      size: 5092703
+    - path: src/config.py
+      hash: md5
+      md5: e36cc244f2ec2f9471f43541705bf9df
+      size: 1508
+    - path: src/data.py
+      hash: md5
+      md5: ea25f9f71f8300183daf5cb0ad4cb63c
+      size: 2630
+    - path: src/preprocess.py
+      hash: md5
+      md5: 85d5f258540282d27e995e44a7a04011
+      size: 2620
+    - path: src/validate.py
+      hash: md5
+      md5: cc4ad0377722289642f57c6a13aec111
+      size: 2666
+    params:
+      params.yaml:
+        semilla: 42
+        split:
+          test_size: 0.2
+          val_size: 0.0
+          estratificar: true
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: f0ab8f4c07359a308eb99cedb8aa6005
+      size: 1011776
+    - path: data/processed/train.csv
+      hash: md5
+      md5: bcac48171d18fff1c730ce635f71148e
+      size: 4063424
+  entrenar:
+    cmd: python -m src.train
+    deps:
+    - path: config/business.yaml
+      hash: md5
+      md5: 8535a55647d24c99d8fcd220984c638d
+      size: 2566
+    - path: data/processed/test.csv
+      hash: md5
+      md5: f0ab8f4c07359a308eb99cedb8aa6005
+      size: 1011776
+    - path: data/processed/train.csv
+      hash: md5
+      md5: bcac48171d18fff1c730ce635f71148e
+      size: 4063424
+    - path: src/config.py
+      hash: md5
+      md5: e36cc244f2ec2f9471f43541705bf9df
+      size: 1508
+    - path: src/metricas.py
+      hash: md5
+      md5: 809795629978f60b1acd222b9723bb1e
+      size: 1483
+    - path: src/modelos.py
+      hash: md5
+      md5: 08dd73f26642bb6f73e3e3af0cf22b5b
+      size: 2975
+    - path: src/preprocess.py
+      hash: md5
+      md5: 85d5f258540282d27e995e44a7a04011
+      size: 2620
+    - path: src/train.py
+      hash: md5
+      md5: 8b62cb25634cb3dbb66a9dca5931be31
+      size: 8215
+    params:
+      params.yaml:
+        cv:
+          n_folds: 3
+        modelos:
+          regresion_logistica:
+            C: 1.0
+            max_iter: 1000
+            class_weight: balanced
+          random_forest:
+            n_estimators: 200
+            class_weight: balanced
+            n_jobs: 1
+        optimizacion:
+          modelo_a_optimizar: random_forest
+          metodo: randomized_search
+          n_iter: 12
+          espacio_busqueda:
+            clf__n_estimators:
+            - 150
+            - 200
+            - 300
+            - 400
+            clf__max_depth:
+            - 
+            - 10
+            - 16
+            - 24
+            - 32
+            clf__min_samples_split:
+            - 2
+            - 5
+            - 10
+            - 20
+            clf__min_samples_leaf:
+            - 1
+            - 2
+            - 4
+            clf__max_features:
+            - sqrt
+            - log2
+            - 0.5
+            clf__class_weight:
+            - balanced
+            - balanced_subsample
+        semilla: 42
+    outs:
+    - path: models/model.joblib
+      hash: md5
+      md5: 5b30b298122cb24639f44a2a999c8d1e
+      size: 415633467
+    - path: models/model_meta.json
+      hash: md5
+      md5: 0182fe225abb893905a297c52dd80fb5
+      size: 378
+    - path: reports/comparacion.csv
+      hash: md5
+      md5: 2b54230313d0e8dcb351c8b0b8f241ae
+      size: 397
+  evaluar:
+    cmd: python -m src.evaluate
+    deps:
+    - path: config/business.yaml
+      hash: md5
+      md5: 8535a55647d24c99d8fcd220984c638d
+      size: 2566
+    - path: data/processed/test.csv
+      hash: md5
+      md5: f0ab8f4c07359a308eb99cedb8aa6005
+      size: 1011776
+    - path: models/model.joblib
+      hash: md5
+      md5: 5b30b298122cb24639f44a2a999c8d1e
+      size: 415633467
+    - path: src/config.py
+      hash: md5
+      md5: e36cc244f2ec2f9471f43541705bf9df
+      size: 1508
+    - path: src/evaluate.py
+      hash: md5
+      md5: be8654a2a04da6a9783b13ed2751dfd1
+      size: 4289
+    - path: src/metricas.py
+      hash: md5
+      md5: 809795629978f60b1acd222b9723bb1e
+      size: 1483
+    - path: src/preprocess.py
+      hash: md5
+      md5: 85d5f258540282d27e995e44a7a04011
+      size: 2620
+    outs:
+    - path: reports/figures/curva_pr.png
+      hash: md5
+      md5: 89fa38a93ec781b431e52b179815b806
+      size: 34950
+    - path: reports/figures/curva_roc.png
+      hash: md5
+      md5: a219d0ef4512348d67d5c3d0ca8b609d
+      size: 37381
+    - path: reports/figures/matriz_confusion.png
+      hash: md5
+      md5: df5e000098d9f9b8b7fd3edceb054b48
+      size: 19858
+    - path: reports/metrics.json
+      hash: md5
+      md5: da8e96add91259a2abbfc2222524a651
+      size: 491
