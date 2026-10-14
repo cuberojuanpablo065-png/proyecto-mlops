@@ -23,3 +23,8 @@ def test_particion_es_estratificada(datos_sinteticos):
     p_train = train["target"].mean()
     p_test = test["target"].mean()
     assert abs(p_train - p_test) < 0.05, "La estratificación no se mantuvo"
+
+
+def test_objetivo_sin_nulos(datos_sinteticos):
+    """El objetivo no tiene valores nulos."""
+    assert datos_sinteticos["target"].notna().all()
