@@ -1,0 +1,53 @@
+# =====================================================================
+# A.1 - El problema de negocio en un archivo de configuración
+# ---------------------------------------------------------------------
+# Centraliza la definición del problema. El código lo lee (src/config.py)
+# en lugar de tener valores "hardcodeados".
+# =====================================================================
+
+problema: prediccion_aumento_criminalidad
+
+# Descripción del negocio:
+# A partir de las estadísticas oficiales de criminalidad de la India
+# (NCRB), se quiere anticipar, para cada combinación estado × tipo de
+# crimen, si el número de CASOS REGISTRADOS el próximo año AUMENTARÁ
+# respecto al año anterior. Esto permite a las autoridades priorizar
+# recursos (personal, prevención, presupuesto) en los estados/categorías
+# con mayor riesgo de alza.
+descripcion: >
+  Predecir si los casos registrados de una categoría de crimen en un
+  estado aumentarán respecto al año previo (clasificación binaria).
+  Usa solo información histórica (rezagos), nunca el valor del año a
+  predecir, para evitar fuga de datos.
+
+# --- Métricas ---------------------------------------------------------
+# Las clases están razonablemente balanceadas (~46% "sube"), pero como el
+# interés del negocio es ACERTAR las alzas (clase positiva), se usa F1 de
+# la clase positiva como métrica principal, no accuracy.
+metrica_tecnica: f1
+umbral_minimo_metrica: 0.60        # mínimo aceptable para el negocio (se usa en una prueba, A.7)
+metricas_secundarias:
+  - recall                          # no perder alzas reales
+  - precision                       # no sobre-alertar
+  - roc_auc
+  - pr_auc
+
+# --- Línea base -------------------------------------------------------
+# Regla de negocio simple (además del DummyClassifier): "regla de
+# reversión a la media": si el año pasado NO subió (cayó o se mantuvo),
+# predecir que este año sube. Captura el patrón observado en los datos.
+linea_base: regla_reversion
+
+# --- Tipo de predicción ----------------------------------------------
+tipo_prediccion: batch_anual        # se evalúa una vez al año, por lotes
+
+# --- Columna objetivo -------------------------------------------------
+columna_objetivo: target
+clase_positiva: 1
+
+# --- Opcional (valor agregado): costo de los errores ------------------
+# FN: no anticipamos un alza real -> no reforzamos prevención -> costo alto.
+# FP: alertamos un alza que no ocurre -> gasto preventivo innecesario -> costo menor.
+costos:
+  falso_negativo: 5.0
+  falso_positivo: 1.0

@@ -1,0 +1,52 @@
+# =====================================================================
+# params.yaml - Parámetros del pipeline y espacios de búsqueda
+# ---------------------------------------------------------------------
+# DVC rastrea este archivo: cambiarlo invalida las etapas que dependen
+# de él y "dvc repro" vuelve a ejecutarlas. Mantener aquí TODO lo que
+# controla el comportamiento del pipeline facilita la reproducibilidad.
+# =====================================================================
+
+semilla: 42                         # semilla global para reproducibilidad
+
+datos:
+  # Fuente: CrimeBase (NCRB India) en Kaggle. El usuario coloca
+  # crime_state_year.csv en data/external/ (ver README). La ingesta
+  # construye el panel modelable (rezagos + objetivo) en archivo_crudo.
+  fuente_externa: "data/external/crime_state_year.csv"
+  archivo_crudo: "data/raw/crime_panel.csv"
+  metrica_fuente: cases_registered  # solo filas de casos registrados
+  # Para el versionamiento de datos (B.2.3) y el drift (Entregable 3):
+  # la versión 1 usa años <= anio_corte_v1; la v2 (--simular-v2) usa todos.
+  anio_corte_v1: 2019
+
+split:
+  test_size: 0.2
+  val_size: 0.0                     # 0 => sin set de validación aparte (se usa CV)
+  estratificar: true
+
+cv:
+  n_folds: 3                        # validación cruzada para optimización (NO toca el test)
+
+# --- Espacio de búsqueda de hiperparámetros (A.5) ---------------------
+optimizacion:
+  modelo_a_optimizar: random_forest
+  metodo: randomized_search        # randomized_search | grid_search
+  n_iter: 12                       # combinaciones a probar
+  espacio_busqueda:
+    clf__n_estimators: [150, 200, 300, 400]
+    clf__max_depth: [null, 10, 16, 24, 32]
+    clf__min_samples_split: [2, 5, 10, 20]
+    clf__min_samples_leaf: [1, 2, 4]
+    clf__max_features: ["sqrt", "log2", 0.5]
+    clf__class_weight: ["balanced", "balanced_subsample"]
+
+# --- Modelos base a comparar (A.4) ------------------------------------
+modelos:
+  regresion_logistica:
+    C: 1.0
+    max_iter: 1000
+    class_weight: balanced
+  random_forest:
+    n_estimators: 200
+    class_weight: balanced
+    n_jobs: 1                       # n_jobs=1 => resultados deterministas (reproducibilidad)
