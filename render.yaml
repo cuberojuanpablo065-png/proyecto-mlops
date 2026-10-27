@@ -1,5 +1,4 @@
 # Blueprint de despliegue en Render.com (capa gratuita).
-# Dos servicios Docker. El modelo se descarga de MODEL_URL al iniciar.
 services:
   - type: web
     name: model-service
@@ -10,6 +9,8 @@ services:
     envVars:
       - key: MODEL_URL
         sync: false
+      - key: MODEL_PATH
+        value: /tmp/model.joblib
       - key: DB_PATH
         value: /tmp/predicciones.db
 
