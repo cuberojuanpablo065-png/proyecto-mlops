@@ -1,15 +1,6 @@
-# =====================================================================
-# render.yaml - Blueprint de despliegue en Render.com (capa gratuita)
-# ---------------------------------------------------------------------
-# Define los dos servicios como contenedores Docker. Render construye
-# cada imagen desde su Dockerfile y expone una URL pública (HTTPS).
-#
-# El modelo NO va en la imagen: el model-service lo descarga al iniciar
-# desde MODEL_URL (un asset de GitHub Release). Las variables sensibles
-# (OPENAI_API_KEY) se configuran en el panel de Render, no aquí.
-# =====================================================================
+# Blueprint de despliegue en Render.com (capa gratuita).
+# Dos servicios Docker. El modelo se descarga de MODEL_URL al iniciar.
 services:
-  # --- API del modelo ---
   - type: web
     name: model-service
     runtime: docker
@@ -18,11 +9,10 @@ services:
     healthCheckPath: /health
     envVars:
       - key: MODEL_URL
-        sync: false          # se completa en el panel (URL del release)
+        sync: false
       - key: DB_PATH
         value: /tmp/predicciones.db
 
-  # --- Servicio LLM ---
   - type: web
     name: llm-service
     runtime: docker
@@ -31,11 +21,8 @@ services:
     healthCheckPath: /health
     envVars:
       - key: MODEL_SERVICE_URL
-        fromService:
-          name: model-service
-          type: web
-          property: hostport   # host:puerto interno del otro servicio
+        sync: false
       - key: LLM_MOCK
-        value: "true"          # cambia a false y agrega OPENAI_API_KEY para el LLM real
+        value: "true"
       - key: OPENAI_API_KEY
         sync: false
