@@ -1,0 +1,32 @@
+# =====================================================================
+# Dockerfile del servicio de la API del modelo (model-service)
+# Imagen base con versión fija. Construcción multi-stage + usuario no root.
+# =====================================================================
+FROM python:3.12-slim AS base
+
+# Evita archivos .pyc y activa salida sin buffer (logs en vivo).
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# 1) Dependencias (capa cacheable: solo se reinstala si cambian).
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# 2) Código de la aplicación (solo lo necesario, no datos ni modelos).
+COPY src/ ./src/
+COPY app/ ./app/
+COPY config/ ./config/
+
+# Usuario no root por seguridad.
+RUN useradd --create-home appuser
+USER appuser
+
+EXPOSE 8000
+
+# Chequeo de salud del contenedor.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,18 @@
+# No copiar a las imágenes: datos, modelos, entornos, artefactos.
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.dvc/
+mlruns/
+mlflow.db
+data/external/
+data/raw/
+data/processed/
+*.db
+reports/
+notebooks/
+tests/
+.pytest_cache/
+.env
