@@ -302,3 +302,13 @@ Se usó la capa/crédito gratuito (GitHub Student Pack en DigitalOcean) con una
 **alerta de presupuesto** configurada. **Al terminar la revisión, elimine los
 recursos** (`terraform destroy`, o borre el Droplet, el firewall y el bucket)
 para evitar cobros.
+
+## Despliegue en producción (Entregable 2)
+
+- **API del modelo (público):** https://model-service-88hd.onrender.com  (`/health`, `/predict`, `/docs`)
+- **Servicio LLM (público):** https://llm-service-zsui.onrender.com  (`/explain`)
+- **Imágenes publicadas (GitHub Container Registry):**
+  - `ghcr.io/cuberojuanpablo065-png/model-service:0.2.0`
+  - `ghcr.io/cuberojuanpablo065-png/llm-service:0.2.0`
+- **Proveedor:** Render.com (capa gratuita). El modelo se descarga al iniciar
+  desde un GitHub Release (asset `model.joblib`), no va dentro de la imagen.
