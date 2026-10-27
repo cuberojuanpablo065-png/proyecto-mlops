@@ -1,0 +1,7 @@
+# Copie a terraform.tfvars y complete. NO suba terraform.tfvars a Git.
+do_token          = "dop_v1_..."
+spaces_access_id  = "..."
+spaces_secret_key = "..."
+region            = "nyc3"
+spaces_bucket     = "crime-mlops-tuusuario"
+ssh_key_ids       = ["12345678"]
