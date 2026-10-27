@@ -42,3 +42,21 @@ Thumbs.db
 .vscode/
 .idea/
 mlflow.db
+
+# --- Entregable 2 ---
+.env
+*.db
+data/predicciones.db
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+
+# --- Entregable 2 ---
+.env
+*.db
+data/predicciones.db
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars

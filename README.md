@@ -168,3 +168,137 @@ Ver `reports/` para la tabla de comparación completa y los gráficos.
 ## Licencia y fuente de los datos
 Dataset: CrimeBase — estadisticas de criminalidad de la NCRB (National Crime Records Bureau, Government of India), obtenido via Kaggle.
 Licencia: ver la pagina del dataset en Kaggle (datos gubernamentales de acceso abierto). Indicar aqui la licencia exacta que muestre Kaggle (por ejemplo "CC0: Public Domain" u "Other").
+
+---
+
+# Entregable 2 — Nube, APIs, microservicios y contenedores
+
+Expone el modelo del Entregable 1 como un **servicio web (API)**, lo
+empaqueta en **contenedores** y lo despliega en la **nube**, más un servicio
+con **LLM** que explica las predicciones y un prototipo de **servidor MCP**.
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    Cliente -->|HTTP| LLM[llm-service<br/>explica la prediccion]
+    Cliente -->|HTTP| API[model-service<br/>FastAPI + modelo]
+    LLM -->|HTTP /predict| API
+    LLM -->|API| OpenAI[(OpenAI<br/>gpt-4o-mini)]
+    API -->|lee| Bucket[(Bucket de objetos<br/>modelo)]
+    API -->|escribe| DB[(SQLite<br/>predicciones)]
+    MCP[servidor MCP] -->|/model-info| API
+```
+
+Dos microservicios con funciones separadas: **model-service** (la API del
+modelo) y **llm-service** (explicación en lenguaje natural). Se levantan
+juntos con `docker compose up`.
+
+## Servicios y endpoints
+
+**model-service** (puerto 8000):
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/health` | Estado del servicio y del modelo |
+| GET | `/model-info` | Versión y métricas del modelo |
+| POST | `/predict` | Predicción de un registro |
+| POST | `/predict/batch` | Predicción de una lista (máx. 500) |
+| WS | `/ws/predict` | Predicciones por WebSocket |
+| GET | `/docs` | Documentación automática (Swagger) |
+
+**llm-service** (puerto 8001):
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/health` | Estado y modo (openai / mock) |
+| POST | `/explain` | Explica una predicción (respuesta en streaming) |
+
+## Cómo ejecutar en local
+
+```bash
+cp .env.example .env         # completa OPENAI_API_KEY (o pon LLM_MOCK=true)
+# Asegúrate de tener el modelo en models/model.joblib (del Entregable 1:
+#   dvc repro   ó   python -m src.train)
+docker compose up --build
+```
+
+- API:            http://localhost:8000/health
+- Documentación:  http://localhost:8000/docs
+- Servicio LLM:   http://localhost:8001/health
+
+### Ejemplos de consumo (curl)
+
+```bash
+# Predicción
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"state_code":"MH","scope":"ipc","crime_category":"murder","year":2022,"lag1":300,"lag2":250,"lag3":240}'
+
+# Explicación en lenguaje natural (streaming)
+curl -N -X POST http://localhost:8001/explain \
+  -H "Content-Type: application/json" \
+  -d '{"state_code":"MH","scope":"ipc","crime_category":"murder","year":2022,"lag1":300,"lag2":250}'
+```
+
+También hay ejemplos en `requests.http` (extensión REST Client de VS Code).
+
+## Pruebas
+
+```bash
+pytest tests/test_api.py tests/test_llm.py -v
+```
+
+## Contenedores e imágenes
+
+Cada servicio tiene su `Dockerfile` (`Dockerfile.api`, `Dockerfile.llm`) con
+imagen base fija (`python:3.12-slim`), usuario no root y `HEALTHCHECK`.
+Las imágenes se publican etiquetadas con la versión `0.2.0`:
+
+```bash
+docker build -f Dockerfile.api -t <registro>/model-service:0.2.0 .
+docker build -f Dockerfile.llm -t <registro>/llm-service:0.2.0 .
+docker push <registro>/model-service:0.2.0
+docker push <registro>/llm-service:0.2.0
+```
+
+## Despliegue en la nube (DigitalOcean)
+
+Infraestructura como código en dos variantes:
+- **`scripts/deploy.sh`** — crea los recursos con la CLI (`doctl` + `aws` para Spaces).
+- **`infra/`** — lo mismo con **Terraform** (`terraform init / plan / apply / destroy`).
+
+### Recursos creados (completar tras el despliegue)
+
+| Recurso | Tipo | Región | Tamaño | Puertos |
+|---|---|---|---|---|
+| Bucket del modelo | Spaces (S3) | nyc3 | — | privado |
+| Cómputo | Droplet (Docker) | nyc3 | s-1vcpu-1gb | 8000, 8001 |
+| Red | Firewall | nyc3 | — | 22, 8000, 8001 |
+
+**URL pública del servicio:** `http://<IP-del-droplet>:8000`  *(completar)*
+
+> El modelo NO va dentro de la imagen: el servicio lo descarga del bucket al
+> iniciar (variable `MODEL_S3_URI`), así se puede actualizar sin reconstruir
+> el contenedor. Las credenciales se pasan por variables de entorno (`.env`),
+> nunca en el código.
+
+## Servidor MCP (prototipo)
+
+`mcp_server/server.py` expone la herramienta `obtener_info_modelo`. Se prueba
+con el MCP Inspector:
+
+```bash
+pip install "mcp<2"
+npx @modelcontextprotocol/inspector python -m mcp_server.server
+```
+
+Herramientas planeadas para el Entregable 4 (anotadas en el código):
+`predecir` y `consultar_documentos` (RAG sobre noticias/documentos).
+
+## Costos
+
+Se usó la capa/crédito gratuito (GitHub Student Pack en DigitalOcean) con una
+**alerta de presupuesto** configurada. **Al terminar la revisión, elimine los
+recursos** (`terraform destroy`, o borre el Droplet, el firewall y el bucket)
+para evitar cobros.
