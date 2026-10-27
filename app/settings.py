@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     model_path: str = "models/model.joblib"
     model_meta_path: str = "models/model_meta.json"
 
+    # --- Descarga por URL pública (opcional; p.ej. asset de GitHub Release) ---
+    model_url: str | None = None
+
     # --- Bucket de objetos (opcional; para descargar el modelo de la nube) ---
     # Ejemplo: s3://mi-bucket/modelos/model.joblib
     model_s3_uri: str | None = None

@@ -8,11 +8,31 @@ fuera de la imagen del contenedor y se puede actualizar sin reconstruirla
 from __future__ import annotations
 
 import json
+import urllib.request
 from pathlib import Path
 
 import joblib
 
 from .settings import settings
+
+
+def _descargar_de_url() -> bool:
+    """Descarga el modelo desde una URL pública (MODEL_URL) si está definida.
+
+    Útil para desplegar en servicios como Render usando el modelo publicado
+    como asset de un GitHub Release (almacenamiento de objetos gratuito).
+    Devuelve True si descargó.
+    """
+    url = settings.model_url
+    if not url:
+        return False
+    destino = Path(settings.model_path)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[model] Descargando modelo de {url} -> {destino}")
+    urllib.request.urlopen  # noqa: B018 (claridad)
+    with urllib.request.urlopen(url, timeout=120) as resp, open(destino, "wb") as f:
+        f.write(resp.read())
+    return True
 
 
 def _descargar_de_bucket() -> None:
@@ -54,7 +74,9 @@ class ModeloEnMemoria:
         self.meta: dict = {}
 
     def cargar(self) -> None:
-        _descargar_de_bucket()
+        # Prioridad: URL pública -> bucket S3 -> archivo local.
+        if not _descargar_de_url():
+            _descargar_de_bucket()
         ruta = Path(settings.model_path)
         if not ruta.exists():
             raise FileNotFoundError(
