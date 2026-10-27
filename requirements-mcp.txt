@@ -1,0 +1,4 @@
+# Dependencias del prototipo de servidor MCP (Parte E).
+# Se fija mcp<2 para usar la API FastMCP (mcp.server.fastmcp).
+mcp<2
+httpx>=0.27

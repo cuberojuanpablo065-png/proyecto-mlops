@@ -1,0 +1,6 @@
+# Precios del LLM por 1 millón de tokens (USD).
+# Fuente: precios publicados por el proveedor. Actualizar si cambian.
+# El servicio usa esto para calcular el costo aproximado de cada solicitud.
+modelo: gpt-4o-mini
+precio_input_por_millon: 0.15
+precio_output_por_millon: 0.60
