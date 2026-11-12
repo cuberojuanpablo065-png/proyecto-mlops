@@ -312,3 +312,111 @@ para evitar cobros.
   - `ghcr.io/cuberojuanpablo065-png/llm-service:0.2.0`
 - **Proveedor:** Render.com (capa gratuita). El modelo se descarga al iniciar
   desde un GitHub Release (asset `model.joblib`), no va dentro de la imagen.
+
+---
+
+# Entregable 3 — CI/CD, monitoreo, reentrenamiento y seguridad
+
+Automatiza pruebas y despliegue con **GitHub Actions**, monitorea el servicio,
+reentrena el modelo con control de calidad y aplica controles de seguridad.
+
+> **Dataset (enlace exacto de Kaggle):** `COMPLETAR_CON_LA_URL_EXACTA`
+> Fuente oficial: **NCRB** (National Crime Records Bureau, Government of India).
+> El archivo fuente `data/external/crime_state_year.csv` se versiona con DVC
+> (`dvc add data/external/crime_state_year.csv`); no se sube a Git.
+
+## Correcciones aplicadas (feedback de E1 y E2)
+
+- **División temporal** (no aleatoria): se entrena con los años más antiguos y
+  se prueba con los más recientes (`split.tipo: temporal`, `anio_corte_test`).
+  Además se **quitó `year` como variable** para no inflar el desempeño.
+- **Selección por validación cruzada**, no con el conjunto de prueba: el modelo
+  se elige por `cv_f1` sobre train; el test es solo reporte final.
+- **Prueba de desempeño del modelo real** (`tests/test_desempeno_real.py`), que
+  evalúa el modelo serializado sobre el test real.
+- **`/model-info`** ahora muestra las métricas (el meta siempre las incluye).
+- **Integridad SHA-256**: el servicio verifica el hash del modelo al cargarlo y
+  no lo usa si no coincide.
+
+## Arquitectura (lo realmente implementado)
+
+```mermaid
+flowchart TB
+    subgraph CI_CD [CI/CD - GitHub Actions]
+      PR[Pull Request] --> CI[ci.yml: ruff, pytest-cov, bandit, pip-audit, trivy, build]
+      CI --> merge[merge a main]
+      merge --> CD[cd.yml: publica imagenes + deploy staging]
+      CD -->|aprobacion| PROD[deploy production + rollback]
+    end
+    subgraph Nube [Servicio en Render - HTTPS]
+      cliente --> model[model-service /health /predict /metrics]
+      cliente --> llm[llm-service /explain /metrics]
+      llm --> model
+      model --> rel[(GitHub Release: modelo champion)]
+    end
+    subgraph Mantenimiento [Monitoreo y reentrenamiento]
+      mon[monitor.yml schedule: lee /metrics + drift] -->|alerta| issue[GitHub Issue]
+      retrain[retrain.yml: reentrena + QA + auditoria] --> rel
+    end
+```
+
+- **Despliegue real:** Render.com (HTTPS lo provee Render). La redundancia con
+  **Nginx + 2 réplicas** se demuestra localmente con `docker-compose.redundancia.yml`.
+- **Champion:** el modelo promovido se publica como asset del GitHub Release y el
+  servicio lo descarga al iniciar (sin reconstruir la imagen). El Terraform de
+  `infra/` (DigitalOcean) es una alternativa de referencia, no el despliegue en uso.
+
+## Parte A — Integración continua
+`.github/workflows/ci.yml` corre en cada PR: ruff, pytest con cobertura (≥60%,
+LLM en mock), validación de datos y umbral, build de imágenes y análisis estático
+(Bandit, pip-audit, Trivy). Plantilla de PR en `.github/pull_request_template.md`.
+Proteger `main` para bloquear la fusión si el CI falla (Settings → Branches).
+
+## Parte B — Entrega continua
+`.github/workflows/cd.yml`: al fusionar en `main` publica imágenes con la etiqueta
+del commit en GHCR, despliega en **staging** y verifica `/health` y `/predict`.
+**production** requiere aprobación (ambiente de GitHub) y hace **rollback** si la
+verificación falla. Ambientes `staging` y `production` con sus secretos.
+
+## Parte C — Monitoreo y QA
+- `GET /metrics` en ambos servicios (solicitudes, errores, latencia; distribución
+  de predicciones; tokens y costo en el LLM).
+- `scripts/drift_report.py` compara las predicciones registradas con los datos de
+  entrenamiento (PSI), umbral en `config/drift.yaml`.
+- `scripts/simular_drift.py` envía datos modificados para simular drift.
+- `.github/workflows/monitor.yml` (schedule) lee `/metrics`, evalúa drift/latencia
+  y abre un **Issue** como alerta.
+- `config/qa_gates.yaml` define las condiciones para reemplazar el modelo.
+
+## Parte D — Reentrenamiento y auditoría
+`.github/workflows/retrain.yml` (manual y programado) ejecuta
+`scripts/reentrenar.py`: reentrena, evalúa las condiciones de QA; si cumple,
+promueve el candidato a **champion** y lo publica en el Release; si no, conserva
+el actual. Genera `reports/auditoria_reentrenamiento.json` (fecha, disparador,
+commit, versión, decisión) como artefacto.
+
+## Parte E — Seguridad
+- **Análisis estático** en el CI (Bandit, pip-audit, Trivy) y **dinámico** (OWASP
+  ZAP contra staging; ver más abajo).
+- **Validación** con Pydantic `extra="forbid"` y límite de tamaño de lote.
+- **Autenticación** por API key (`API_KEY`) y **límite de tasa** por IP.
+- **HTTPS** (Render) e **integridad SHA-256** del modelo.
+- **Carga** con Locust (`locustfile.py`, dos niveles) y **redundancia** con Nginx
+  (`docker-compose.redundancia.yml`): se detiene una réplica y el servicio sigue.
+
+### Comandos útiles
+```bash
+# Pruebas con cobertura
+pytest --cov=app --cov=src --cov=llm_service --cov-report=term
+
+# Redundancia (Nginx + 2 réplicas)
+docker compose -f docker-compose.redundancia.yml up -d --build
+# en otra terminal, carga:
+locust -f locustfile.py --headless -u 50 -r 10 -t 1m --host http://localhost:8080 --html reports/locust.html
+# detener una réplica y verificar que sigue respondiendo:
+docker compose -f docker-compose.redundancia.yml stop model-b
+curl http://localhost:8080/health
+
+# Análisis dinámico (OWASP ZAP) contra staging:
+docker run --rm ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t https://TU-STAGING.onrender.com
+```

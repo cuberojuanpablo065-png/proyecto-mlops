@@ -1,0 +1,12 @@
+# Configuración de ruff (estilo de código).
+line-length = 100
+target-version = "py311"
+# Los notebooks son exploratorios; no se revisan con las reglas de estilo.
+extend-exclude = ["notebooks", "*.ipynb"]
+
+[lint]
+select = ["E", "F", "W", "I"]   # errores, pyflakes, estilo, orden de imports
+ignore = ["E501"]               # longitud de línea la maneja el formateador
+
+[lint.per-file-ignores]
+"tests/*" = ["E402"]

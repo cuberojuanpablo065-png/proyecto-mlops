@@ -1,0 +1,17 @@
+# Configuración de cobertura. Se excluyen los scripts de pipeline por lotes
+# (se validan ejecutando el pipeline, no con pruebas unitarias) para que la
+# cobertura refleje el código de servicio y de datos que sí se prueba.
+[run]
+omit =
+    src/train.py
+    src/ingest.py
+    src/evaluate.py
+    src/registrar_modelos.py
+    scripts/*
+    tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
