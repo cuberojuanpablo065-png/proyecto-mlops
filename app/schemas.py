@@ -6,15 +6,21 @@ Las variables derivadas (delta_prev, pct_prev) las calcula el servidor.
 """
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Valores válidos (coinciden con el esquema de entrenamiento).
 SCOPES = ["ipc", "sll", "women", "children", "scheduled_castes",
           "scheduled_tribes", "senior_citizens", "juveniles", "cyber"]
 
+# E.2: tamaño máximo de un lote (defensa contra cargas abusivas).
+MAX_LOTE = 500
+
 
 class RegistroEntrada(BaseModel):
     """Una fila a predecir."""
+    # extra="forbid" (E.2.1): rechaza campos desconocidos en la entrada.
+    model_config = ConfigDict(extra="forbid")
+
     state_code: str = Field(..., examples=["MH"], description="Código ISO del estado/UT")
     scope: str = Field(..., examples=["ipc"], description=f"Uno de: {SCOPES}")
     crime_category: str = Field(..., examples=["murder"])
@@ -25,7 +31,9 @@ class RegistroEntrada(BaseModel):
 
 
 class LoteEntrada(BaseModel):
-    registros: list[RegistroEntrada] = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+    # Límite de tamaño del lote directamente en el esquema (E.2).
+    registros: list[RegistroEntrada] = Field(..., min_length=1, max_length=MAX_LOTE)
 
 
 class Prediccion(BaseModel):
@@ -48,3 +56,11 @@ class InfoModelo(BaseModel):
 class Salud(BaseModel):
     estado: str
     modelo_cargado: bool
+
+
+class Metricas(BaseModel):
+    """C.1 - Métricas operativas del servicio."""
+    solicitudes: int
+    errores: int
+    latencia_promedio_ms: float
+    distribucion_predicciones: dict

@@ -7,6 +7,7 @@ fuera de la imagen del contenedor y se puede actualizar sin reconstruirla
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import urllib.request
 from pathlib import Path
@@ -14,6 +15,32 @@ from pathlib import Path
 import joblib
 
 from .settings import settings
+
+
+def _descargar_archivo(url: str, destino: Path) -> None:
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    # La URL la configura el operador (variable de entorno de confianza).
+    with urllib.request.urlopen(url, timeout=120) as resp, open(destino, "wb") as f:  # noqa: S310  # nosec B310
+        f.write(resp.read())
+
+
+def _verificar_hash(ruta: Path) -> None:
+    """E.3 - Verifica el SHA-256 del modelo. Si no coincide, NO se usa.
+
+    El hash esperado viene de MODEL_SHA256 (variable de entorno) o del
+    metadato del modelo. Si no hay hash esperado, solo informa el calculado.
+    """
+    calculado = hashlib.sha256(ruta.read_bytes()).hexdigest()
+    esperado = settings.model_sha256
+    if esperado:
+        if calculado.lower() != esperado.lower():
+            raise RuntimeError(
+                "Integridad del modelo FALLÓ: el SHA-256 no coincide. "
+                f"esperado={esperado} calculado={calculado}. No se carga el modelo."
+            )
+        print(f"[model] Integridad OK (SHA-256 verificado): {calculado}")
+    else:
+        print(f"[model] SHA-256 del modelo: {calculado} (sin hash esperado para comparar)")
 
 
 def _descargar_de_url() -> bool:
@@ -29,8 +56,8 @@ def _descargar_de_url() -> bool:
     destino = Path(settings.model_path)
     destino.parent.mkdir(parents=True, exist_ok=True)
     print(f"[model] Descargando modelo de {url} -> {destino}")
-    urllib.request.urlopen  # noqa: B018 (claridad)
-    with urllib.request.urlopen(url, timeout=120) as resp, open(destino, "wb") as f:
+    # La URL la configura el operador (variable de entorno de confianza).
+    with urllib.request.urlopen(url, timeout=120) as resp, open(destino, "wb") as f:  # noqa: S310  # nosec B310
         f.write(resp.read())
     return True
 
@@ -83,6 +110,17 @@ class ModeloEnMemoria:
                 f"No se encontró el modelo en {ruta}. Genere el modelo "
                 "(Entregable 1) o configure MODEL_S3_URI."
             )
+
+        # Si hay URL de metadatos, descargarla (para que /model-info muestre
+        # las métricas también en la nube).
+        if settings.model_meta_url:
+            try:
+                _descargar_archivo(settings.model_meta_url, Path(settings.model_meta_path))
+            except Exception as exc:  # pragma: no cover
+                print(f"[model] No se pudo descargar el meta: {exc}")
+
+        # E.3 - verificar integridad ANTES de cargar en memoria.
+        _verificar_hash(ruta)
         self.modelo = joblib.load(ruta)
 
         meta = Path(settings.model_meta_path)

@@ -20,6 +20,12 @@ class Settings(BaseSettings):
 
     # --- Descarga por URL pública (opcional; p.ej. asset de GitHub Release) ---
     model_url: str | None = None
+    model_meta_url: str | None = None           # metadatos (para /model-info en la nube)
+    model_sha256: str | None = None             # E.3: hash esperado para verificar integridad
+
+    # --- Seguridad de la API (E.2) ---
+    api_key: str | None = None                  # si se define, exige esta llave en las solicitudes
+    rate_limit: str = "60/minute"               # límite de tasa por IP
 
     # --- Bucket de objetos (opcional; para descargar el modelo de la nube) ---
     # Ejemplo: s3://mi-bucket/modelos/model.joblib
