@@ -17,12 +17,13 @@ def test_particion_sin_fuga(datos_sinteticos):
     assert len(ids_train) + len(ids_test) == len(df), "Se perdieron o duplicaron filas"
 
 
-def test_particion_es_estratificada(datos_sinteticos):
-    """La proporción de la clase positiva se mantiene aprox. en train y test."""
-    train, test = dividir(datos_sinteticos)
-    p_train = train["target"].mean()
-    p_test = test["target"].mean()
-    assert abs(p_train - p_test) < 0.05, "La estratificación no se mantuvo"
+def test_particion_temporal_sin_solape_de_anios(datos_sinteticos):
+    """Feedback E1: la división es por tiempo (train años viejos, test recientes)."""
+    train, test = dividir(datos_sinteticos)   # tipo=temporal por defecto
+    anios_train = set(train["year"])
+    anios_test = set(test["year"])
+    assert anios_train.isdisjoint(anios_test), "No debe compartirse ningún año"
+    assert max(anios_train) < min(anios_test), "El test debe ser de años posteriores al train"
 
 
 def test_objetivo_sin_nulos(datos_sinteticos):
