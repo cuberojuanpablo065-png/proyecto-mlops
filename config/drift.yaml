@@ -1,0 +1,29 @@
+# =====================================================================
+# config/drift.yaml - Umbrales para la detección de drift (Parte C.2)
+# ---------------------------------------------------------------------
+# Se compara la distribución de los datos recientes (predicciones
+# registradas) contra la distribución de entrenamiento (referencia),
+# usando el Índice de Estabilidad de Población (PSI).
+#   PSI < 0.1  -> sin cambios
+#   0.1-0.25   -> cambio moderado
+#   > 0.25     -> drift significativo
+# =====================================================================
+
+# Variables numéricas a vigilar.
+variables:
+  - lag1
+  - delta_prev
+  - pct_prev
+
+# Umbral de PSI a partir del cual se considera drift.
+umbral_psi: 0.25
+
+# Umbral de cambio en la tasa de predicciones positivas ("sube").
+# Si |tasa_actual - tasa_referencia| supera esto, se marca drift de predicciones.
+umbral_tasa_prediccion: 0.15
+
+# Latencia promedio (ms) por encima de la cual se alerta.
+umbral_latencia_ms: 2000
+
+# Mínimo de predicciones registradas para que el análisis sea válido.
+minimo_muestras: 30

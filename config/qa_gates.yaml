@@ -1,0 +1,17 @@
+# =====================================================================
+# config/qa_gates.yaml - Condiciones de calidad para reemplazar el modelo
+# ---------------------------------------------------------------------
+# Un modelo recién reentrenado solo reemplaza al "champion" si cumple
+# TODAS estas condiciones (Parte C.3). Se evalúan en el reentrenamiento
+# (scripts/qa_gates.py).
+# =====================================================================
+
+# 1. Debe superar el umbral mínimo de negocio (de business.yaml).
+superar_umbral_minimo: true
+
+# 2. No debe ser peor que el champion actual por más de esta tolerancia
+#    (en la métrica principal). Ej.: 0.0 => debe igualar o superar al champion.
+tolerancia_vs_champion: 0.0
+
+# 3. (Opcional) recall mínimo aceptable para no perder alzas reales.
+recall_minimo: 0.40
