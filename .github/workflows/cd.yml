@@ -23,8 +23,10 @@ permissions:
   contents: read
   packages: write
 
+# Imágenes bajo el nombre del repo: el token automático (GITHUB_TOKEN) tiene
+# permiso de escritura sin configurar nada extra.
 env:
-  REGISTRO: ghcr.io/${{ github.repository_owner }}
+  REGISTRO: ghcr.io/${{ github.repository }}
 
 jobs:
   # ---------- Publicar imágenes con la etiqueta del commit ----------
@@ -37,7 +39,11 @@ jobs:
       - id: vars
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Login a GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Construir y publicar model-service
         run: |
           docker build -f Dockerfile.api -t $REGISTRO/model-service:${{ steps.vars.outputs.tag }} .
