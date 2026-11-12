@@ -1,0 +1,96 @@
+# =====================================================================
+# Entrega continua (Parte B).
+#  - Al fusionar en main: publica imágenes con la etiqueta del commit y
+#    despliega en STAGING, verificando /health y /predict.
+#  - Despliegue en PRODUCTION: manual (workflow_dispatch) con aprobación
+#    del ambiente 'production'. Despliega la MISMA imagen probada en staging
+#    e implementa rollback si la verificación falla.
+# =====================================================================
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      destino:
+        description: "Ambiente a desplegar"
+        type: choice
+        options: [staging, production]
+        default: production
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRO: ghcr.io/${{ github.repository_owner }}
+
+jobs:
+  # ---------- Publicar imágenes con la etiqueta del commit ----------
+  publicar:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: vars
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Login a GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Construir y publicar model-service
+        run: |
+          docker build -f Dockerfile.api -t $REGISTRO/model-service:${{ steps.vars.outputs.tag }} .
+          docker push $REGISTRO/model-service:${{ steps.vars.outputs.tag }}
+      - name: Construir y publicar llm-service
+        run: |
+          docker build -f Dockerfile.llm -t $REGISTRO/llm-service:${{ steps.vars.outputs.tag }} .
+          docker push $REGISTRO/llm-service:${{ steps.vars.outputs.tag }}
+
+  # ---------- Desplegar en STAGING y verificar ----------
+  desplegar-staging:
+    needs: publicar
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Disparar despliegue en staging (Render Deploy Hook)
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}"
+      - name: Esperar y verificar /health y /predict
+        run: |
+          echo "Esperando a que staging esté arriba..."
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.STAGING_URL }}/health" >/dev/null; then break; fi
+            sleep 10
+          done
+          curl -fsS "${{ vars.STAGING_URL }}/health"
+          curl -fsS -X POST "${{ vars.STAGING_URL }}/predict" \
+            -H "Content-Type: application/json" \
+            -d '{"state_code":"MH","scope":"ipc","crime_category":"murder","year":2022,"lag1":300,"lag2":250}'
+
+  # ---------- Desplegar en PRODUCTION (requiere aprobación) ----------
+  desplegar-production:
+    needs: desplegar-staging
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.destino == 'production'
+    runs-on: ubuntu-latest
+    environment: production        # el ambiente exige aprobación manual
+    steps:
+      - name: Disparar despliegue en production
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_PRODUCTION }}"
+      - name: Verificar /health
+        id: verificar
+        continue-on-error: true
+        run: |
+          ok=1
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ vars.PRODUCTION_URL }}/health" >/dev/null; then ok=0; break; fi
+            sleep 10
+          done
+          exit $ok
+      - name: Rollback si la verificación falló
+        if: steps.verificar.outcome == 'failure'
+        run: |
+          echo "Verificación falló: haciendo rollback al despliegue anterior."
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID_PRODUCTION }}/rollback"
+          exit 1

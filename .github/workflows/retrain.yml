@@ -1,0 +1,81 @@
+# =====================================================================
+# Reentrenamiento (Parte D). Disparadores:
+#   - workflow_dispatch: reentrenamiento MANUAL.
+#   - schedule: reentrenamiento AUTOMÁTICO semanal.
+#   - (el monitor puede dispararlo al detectar drift via workflow_dispatch)
+# Si el modelo nuevo cumple las condiciones de QA (config/qa_gates.yaml) se
+# promueve a champion y se publica como asset del Release, de modo que el
+# servicio lo descargue sin reconstruir la imagen. Genera un JSON de auditoría.
+# =====================================================================
+name: Reentrenamiento
+
+on:
+  workflow_dispatch:
+    inputs:
+      disparador:
+        description: "Motivo del reentrenamiento"
+        type: choice
+        options: [manual, drift]
+        default: manual
+  schedule:
+    - cron: "0 6 * * 1"     # lunes 06:00 UTC
+
+permissions:
+  contents: write           # para subir el champion al Release
+
+jobs:
+  reentrenar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+
+      - name: Descargar datos fuente (DVC remoto o asset del Release)
+        env:
+          DATA_URL: ${{ secrets.DATA_URL }}
+        run: |
+          mkdir -p data/external
+          # El CSV fuente se guarda como asset privado/entregado por secreto DATA_URL.
+          curl -fsSL "$DATA_URL" -o data/external/crime_state_year.csv
+
+      - name: Descargar champion actual (para comparar en QA)
+        continue-on-error: true
+        run: |
+          mkdir -p models
+          gh release download modelo-v0.2.0 -p champion_meta.json -D models/ || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir panel y preparar datos
+        run: |
+          python -m src.ingest
+          python -m src.data
+
+      - name: Reentrenar con QA y auditoría
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"
+        run: python -m scripts.reentrenar --disparador ${{ github.event.inputs.disparador || 'schedule' }}
+
+      - name: Publicar champion si fue promovido
+        if: hashFiles('models/champion.joblib') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if grep -q '"promovido_a_champion"' reports/auditoria_reentrenamiento.json; then
+            gh release upload modelo-v0.2.0 models/champion.joblib models/champion_meta.json --clobber
+            echo "Champion publicado en el Release."
+          else
+            echo "El candidato no cumplió QA; se conserva el champion actual."
+          fi
+
+      - name: Guardar reporte de auditoría
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-reentrenamiento
+          path: reports/auditoria_reentrenamiento.json

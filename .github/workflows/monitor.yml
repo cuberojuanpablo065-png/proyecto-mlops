@@ -1,0 +1,70 @@
+# =====================================================================
+# Monitoreo programado (Parte C.2). Disparador: schedule.
+#   1. Consulta /metrics del servicio en staging.
+#   2. Evalúa la latencia y la tasa de predicciones (señal de drift).
+#   3. Si hay drift o la latencia es alta, abre un ISSUE de GitHub (alerta).
+# =====================================================================
+name: Monitoreo
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"     # cada 6 horas
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write               # para crear la alerta como issue
+
+jobs:
+  monitorear:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Consultar /metrics y evaluar
+        id: chequeo
+        run: |
+          set -e
+          URL="${{ vars.STAGING_URL }}"
+          curl -fsS "$URL/metrics" -o metrics.json || echo '{}' > metrics.json
+          cat metrics.json
+          python - <<'PY'
+          import json, os
+          m = json.load(open("metrics.json"))
+          lat = m.get("latencia_promedio_ms", 0) or 0
+          dist = m.get("distribucion_predicciones", {}) or {}
+          total = sum(dist.values()) or 1
+          tasa_sube = dist.get("sube", 0) / total
+          # Umbrales (coinciden con config/drift.yaml)
+          UMBRAL_LAT = 2000
+          alerta = []
+          if lat > UMBRAL_LAT:
+              alerta.append(f"Latencia alta: {lat} ms (> {UMBRAL_LAT})")
+          # Señal simple de drift de predicciones (tasa muy alejada de ~0.46)
+          if total >= 30 and abs(tasa_sube - 0.46) > 0.30:
+              alerta.append(f"Posible drift de predicciones: tasa 'sube'={tasa_sube:.2f}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"hay_alerta={'si' if alerta else 'no'}\n")
+              f.write("detalle<<EOF\n" + ("\n".join(alerta) or "Sin anomalías") + "\nEOF\n")
+          print("Alertas:", alerta)
+          PY
+
+      - name: Abrir issue de alerta
+        if: steps.chequeo.outputs.hay_alerta == 'si'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Monitoreo] Anomalía detectada ${new Date().toISOString().slice(0,10)}`,
+              body: `El monitoreo programado detectó una anomalía:\n\n\`\`\`\n${{ steps.chequeo.outputs.detalle }}\n\`\`\`\n\nRevisar el servicio y considerar un reentrenamiento (workflow "Reentrenamiento").`,
+              labels: ["monitoreo", "alerta"]
+            })
+
+      - name: Guardar métricas como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-snapshot
+          path: metrics.json
