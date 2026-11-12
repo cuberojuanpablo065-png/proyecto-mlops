@@ -16,16 +16,22 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import threading
 import time
 
 import httpx
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .settings import settings
+
+# --- C.1: métricas operativas del servicio LLM (tokens y costo acumulados) ---
+_lock = threading.Lock()
+_metricas = {"solicitudes": 0, "errores": 0, "latencia_total_ms": 0.0,
+             "tokens_entrada": 0, "tokens_salida": 0, "costo_total_usd": 0.0}
 
 # --- Log en formato JSON a stdout ---
 logger = logging.getLogger("llm-service")
@@ -45,6 +51,7 @@ app = FastAPI(title="Servicio LLM - explicación de predicciones", version="0.2.
 
 
 class ExplicacionEntrada(BaseModel):
+    model_config = ConfigDict(extra="forbid")   # E.2: rechaza campos desconocidos
     state_code: str = Field(..., examples=["MH"])
     scope: str = Field(..., examples=["ipc"])
     crime_category: str = Field(..., examples=["murder"])
@@ -168,21 +175,46 @@ def _generar(entrada: ExplicacionEntrada, pred: dict):
                 tokens_out = evento.usage.completion_tokens
 
     latencia = round(time.perf_counter() - t0, 3)
+    costo = _costo(tokens_in, tokens_out)
     log = {
         "evento": "explicacion",
         "modelo_llm": settings.llm_model,
         "prediccion": pred["etiqueta"],
         "tokens_entrada": tokens_in,
         "tokens_salida": tokens_out,
-        "costo_usd": _costo(tokens_in, tokens_out),
+        "costo_usd": costo,
         "latencia_s": latencia,
     }
     logger.info(json.dumps(log, ensure_ascii=False))
+
+    # C.1: acumular métricas del servicio.
+    with _lock:
+        _metricas["solicitudes"] += 1
+        _metricas["latencia_total_ms"] += latencia * 1000
+        _metricas["tokens_entrada"] += tokens_in
+        _metricas["tokens_salida"] += tokens_out
+        _metricas["costo_total_usd"] += costo
 
 
 @app.get("/health")
 def health():
     return {"estado": "ok", "modo": "mock" if (settings.llm_mock or not settings.openai_api_key) else "openai"}
+
+
+@app.get("/metrics")
+def metrics():
+    """C.1 - Métricas del servicio LLM: solicitudes, latencia, tokens y costo."""
+    with _lock:
+        n = _metricas["solicitudes"]
+        prom = (_metricas["latencia_total_ms"] / n) if n else 0.0
+        return {
+            "solicitudes": n,
+            "errores": _metricas["errores"],
+            "latencia_promedio_ms": round(prom, 2),
+            "tokens_entrada_total": _metricas["tokens_entrada"],
+            "tokens_salida_total": _metricas["tokens_salida"],
+            "costo_total_usd": round(_metricas["costo_total_usd"], 6),
+        }
 
 
 @app.post("/explain")
