@@ -20,9 +20,13 @@ datos:
   anio_corte_v1: 2022
 
 split:
-  test_size: 0.2
-  val_size: 0.0                     # 0 => sin set de validación aparte (se usa CV)
-  estratificar: true
+  # Feedback E1: la división debe ser POR TIEMPO (no aleatoria), porque el
+  # problema predice el próximo año. Se entrena con años <= anio_corte_test
+  # y se prueba con años > anio_corte_test (datos más recientes, no vistos).
+  tipo: temporal                    # temporal | aleatorio
+  anio_corte_test: 2020             # train: años <= 2020 ; test: años 2021-2022
+  test_size: 0.2                    # solo se usa si tipo = aleatorio
+  estratificar: true                # solo se usa si tipo = aleatorio
 
 cv:
   n_folds: 3                        # validación cruzada para optimización (NO toca el test)
@@ -31,9 +35,9 @@ cv:
 optimizacion:
   modelo_a_optimizar: random_forest
   metodo: randomized_search        # randomized_search | grid_search
-  n_iter: 12                       # combinaciones a probar
+  n_iter: 6                       # combinaciones a probar
   espacio_busqueda:
-    clf__n_estimators: [150, 200, 300, 400]
+    clf__n_estimators: [100, 150, 200]
     clf__max_depth: [null, 10, 16, 24, 32]
     clf__min_samples_split: [2, 5, 10, 20]
     clf__min_samples_leaf: [1, 2, 4]

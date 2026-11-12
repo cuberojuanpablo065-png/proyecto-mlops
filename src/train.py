@@ -15,13 +15,13 @@ import json
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 import joblib
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.base import clone
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_score
 
 from .config import (
     RUTA_MODELOS,
@@ -81,10 +81,19 @@ def _hash_datos_dvc() -> str:
 
 
 def entrenar_y_comparar(X_train, y_train, X_test, y_test, metrica_principal: str):
-    """A.4 - Entrena baseline + modelos y arma la tabla de comparación."""
+    """A.4 - Compara modelos por VALIDACIÓN CRUZADA en train (no por test).
+
+    Feedback E1: el modelo final NO debe elegirse con el conjunto de prueba.
+    Aquí se calcula el score de validación cruzada (cv) de cada candidato sobre
+    el TRAIN; esa es la base para elegir. Las métricas de test se calculan solo
+    como reporte honesto del desempeño, nunca para seleccionar.
+    """
     modelos = construir_modelos()
+    params = cargar_params()
+    n_folds = params["cv"]["n_folds"]
     filas = []
     entrenados: dict[str, object] = {}
+    cv_scores: dict[str, float] = {}
 
     mlflow.set_experiment(EXPERIMENTO_MLFLOW)
     commit = _commit_git()
@@ -92,10 +101,19 @@ def entrenar_y_comparar(X_train, y_train, X_test, y_test, metrica_principal: str
 
     for nombre, modelo in modelos.items():
         with mlflow.start_run(run_name=nombre):
+            # Score de validación cruzada en train (criterio de selección).
+            try:
+                cv = cross_val_score(
+                    clone(modelo), X_train, y_train,
+                    scoring=metrica_principal, cv=n_folds, n_jobs=-1,
+                ).mean()
+            except Exception:
+                cv = float("nan")
+
+            # Ajuste final en todo el train y métricas de test (solo reporte).
             t0 = time.perf_counter()
             modelo.fit(X_train, y_train)
             t_entrenamiento = time.perf_counter() - t0
-
             y_pred = modelo.predict(X_test)
             y_proba = proba_positiva(modelo, X_test)
             met = calcular_metricas(y_test, y_pred, y_proba)
@@ -105,25 +123,26 @@ def entrenar_y_comparar(X_train, y_train, X_test, y_test, metrica_principal: str
             mlflow.set_tag("dvc_data_md5", hash_datos)
             mlflow.set_tag("modelo", nombre)
             mlflow.log_param("modelo", nombre)
+            mlflow.log_metric(f"cv_{metrica_principal}", cv)
             mlflow.log_metric("tiempo_entrenamiento_s", t_entrenamiento)
             for k, v in met.items():
-                mlflow.log_metric(k, v)
+                mlflow.log_metric(f"test_{k}", v)
             _log_model(modelo)
 
-            fila = {"modelo": nombre, "tiempo_entrenamiento_s": round(t_entrenamiento, 4)}
-            fila.update({k: round(v, 4) for k, v in met.items()})
+            fila = {"modelo": nombre, f"cv_{metrica_principal}": round(cv, 4)}
+            fila.update({f"test_{k}": round(v, 4) for k, v in met.items()})
             filas.append(fila)
             entrenados[nombre] = modelo
+            cv_scores[nombre] = cv
             print(
-                f"[train] {nombre:30s} {metrica_principal}="
-                f"{met.get(metrica_principal, float('nan')):.4f}  "
-                f"({t_entrenamiento:.2f}s)"
+                f"[train] {nombre:30s} cv_{metrica_principal}={cv:.4f}  "
+                f"test_{metrica_principal}={met.get(metrica_principal, float('nan')):.4f}"
             )
 
     comparacion = pd.DataFrame(filas).sort_values(
-        metrica_principal, ascending=False
+        f"cv_{metrica_principal}", ascending=False, ignore_index=True
     )
-    return comparacion, entrenados
+    return comparacion, entrenados, cv_scores
 
 
 def optimizar_random_forest(X_train, y_train, metrica_principal: str):
@@ -183,25 +202,26 @@ def main() -> int:
     X_train, y_train = separar_x_y(df_train)
     X_test, y_test = separar_x_y(df_test)
 
-    # A.4 - comparación
-    comparacion, entrenados = entrenar_y_comparar(
+    # A.4 - comparación por validación cruzada
+    comparacion, entrenados, cv_scores = entrenar_y_comparar(
         X_train, y_train, X_test, y_test, metrica_principal
     )
 
-    # A.5 - optimización del RF
-    rf_opt, mejores_params, cv_score = optimizar_random_forest(
+    # A.5 - optimización del RF (su score es de validación cruzada en train)
+    rf_opt, mejores_params, cv_score_rf = optimizar_random_forest(
         X_train, y_train, metrica_principal
     )
+    cv_scores["random_forest_optimizado"] = cv_score_rf
 
-    # Evaluar el RF optimizado en test y agregarlo a la comparación
+    # Agregar el RF optimizado a la comparación (test solo como reporte)
     y_pred = rf_opt.predict(X_test)
     y_proba = proba_positiva(rf_opt, X_test)
     met_opt = calcular_metricas(y_test, y_pred, y_proba)
-    fila_opt = {"modelo": "random_forest_optimizado", "tiempo_entrenamiento_s": None}
-    fila_opt.update({k: round(v, 4) for k, v in met_opt.items()})
+    fila_opt = {"modelo": "random_forest_optimizado", f"cv_{metrica_principal}": round(cv_score_rf, 4)}
+    fila_opt.update({f"test_{k}": round(v, 4) for k, v in met_opt.items()})
     comparacion = pd.concat(
         [comparacion, pd.DataFrame([fila_opt])], ignore_index=True
-    ).sort_values(metrica_principal, ascending=False, ignore_index=True)
+    ).sort_values(f"cv_{metrica_principal}", ascending=False, ignore_index=True)
 
     # Guardar tabla de comparación (A.4)
     ruta_comp = RUTA_REPORTES / "comparacion.csv"
@@ -209,25 +229,41 @@ def main() -> int:
     print(f"\n[train] Comparación guardada en {ruta_comp}:")
     print(comparacion.to_string(index=False))
 
-    # Seleccionar el mejor modelo por la métrica principal
-    mejor_nombre = comparacion.iloc[0]["modelo"]
+    # Seleccionar el mejor modelo por el SCORE DE VALIDACIÓN CRUZADA (no test)
     candidatos = dict(entrenados)
     candidatos["random_forest_optimizado"] = rf_opt
+    mejor_nombre = max(cv_scores, key=lambda k: (cv_scores[k] if cv_scores[k] == cv_scores[k] else -1))
     mejor_modelo = candidatos[mejor_nombre]
-    print(f"\n[train] Mejor modelo: {mejor_nombre}")
+    print(f"\n[train] Mejor modelo (por cv_{metrica_principal}): {mejor_nombre}")
+
+    # Métricas de test del modelo elegido (reporte honesto final)
+    met_mejor = calcular_metricas(
+        y_test, mejor_modelo.predict(X_test), proba_positiva(mejor_modelo, X_test)
+    )
 
     # A.8 - Serialización (Pipeline incluye el preprocesamiento)
     ruta_modelo = RUTA_MODELOS / "model.joblib"
     joblib.dump(mejor_modelo, ruta_modelo)
     print(f"[train] Modelo serializado en {ruta_modelo}")
 
-    # Metadatos del modelo seleccionado
+    # E.3 - Hash SHA-256 del modelo (integridad). Se guarda en el meta y en un
+    # archivo aparte para verificarlo al cargar en el servicio.
+    import hashlib
+
+    sha = hashlib.sha256(ruta_modelo.read_bytes()).hexdigest()
+    (RUTA_MODELOS / "model.sha256").write_text(sha, encoding="utf-8")
+    print(f"[train] SHA-256: {sha}")
+
+    # Metadatos del modelo seleccionado (siempre con métricas -> arregla /model-info)
     meta = {
         "mejor_modelo": mejor_nombre,
         "metrica_principal": metrica_principal,
-        "metricas_test": met_opt if mejor_nombre == "random_forest_optimizado" else None,
-        "mejores_hiperparametros": mejores_params,
-        "cv_score": cv_score,
+        "cv_score": round(cv_scores[mejor_nombre], 4),
+        "metricas": {k: round(v, 4) for k, v in met_mejor.items()},
+        "metricas_test": {k: round(v, 4) for k, v in met_mejor.items()},
+        "version_datos": "v2",
+        "seleccion": f"validacion_cruzada_{metrica_principal}",
+        "sha256": sha,
         "git_commit": _commit_git(),
     }
     (RUTA_MODELOS / "model_meta.json").write_text(

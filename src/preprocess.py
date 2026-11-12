@@ -18,12 +18,17 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from .config import cargar_business
 
 # --- Grupos de columnas ----------------------------------------------
-COLUMNAS_NUMERICAS = ["year", "lag1", "lag2", "lag3", "delta_prev", "pct_prev"]
+# Feedback E1: se QUITA 'year' como variable. Con división temporal, usar el
+# año permite "memorizar" el tiempo e infla el desempeño; la señal temporal
+# ya está en los rezagos (lag1..lag3, delta_prev, pct_prev).
+COLUMNAS_NUMERICAS = ["lag1", "lag2", "lag3", "delta_prev", "pct_prev"]
 COLUMNAS_CATEGORICAS = ["state_code", "scope", "crime_category"]
 
 # Columnas que NO son features (se excluyen de X).
 # 'value' se excluye para evitar fuga de datos (es de donde sale el target).
-COLUMNAS_NO_FEATURE = ["value", "crime_head", "state", "target"]
+# 'year' se conserva en el DataFrame (para la división temporal) pero NO es
+# feature: el ColumnTransformer lo descarta (remainder='drop').
+COLUMNAS_NO_FEATURE = ["value", "crime_head", "state", "target", "year"]
 
 
 def separar_x_y(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:

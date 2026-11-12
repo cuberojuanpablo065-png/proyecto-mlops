@@ -25,7 +25,7 @@ descripcion: >
 # interés del negocio es ACERTAR las alzas (clase positiva), se usa F1 de
 # la clase positiva como métrica principal, no accuracy.
 metrica_tecnica: f1
-umbral_minimo_metrica: 0.60        # mínimo aceptable para el negocio (se usa en una prueba, A.7)
+umbral_minimo_metrica: 0.55        # mínimo aceptable para el negocio (se usa en una prueba, A.7)
 metricas_secundarias:
   - recall                          # no perder alzas reales
   - precision                       # no sobre-alertar

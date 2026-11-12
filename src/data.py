@@ -14,7 +14,13 @@ from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .config import RAIZ, RUTA_DATOS_PROCESADOS, asegurar_directorios, cargar_business, cargar_params
+from .config import (
+    RAIZ,
+    RUTA_DATOS_PROCESADOS,
+    asegurar_directorios,
+    cargar_business,
+    cargar_params,
+)
 from .validate import validar
 
 
@@ -30,15 +36,33 @@ def cargar_crudo() -> pd.DataFrame:
 
 
 def dividir(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Divide en train/test de forma estratificada y reproducible."""
+    """Divide en train/test.
+
+    Por defecto usa división TEMPORAL (feedback E1): entrena con los años más
+    antiguos y prueba con los más recientes, evitando que el modelo "vea" el
+    futuro. Si split.tipo = aleatorio, usa la división estratificada clásica.
+    """
     params = cargar_params()
     business = cargar_business()
     objetivo = business["columna_objetivo"]
+    split = params["split"]
 
-    estratos = df[objetivo] if params["split"]["estratificar"] else None
+    if split.get("tipo", "temporal") == "temporal":
+        corte = split["anio_corte_test"]
+        train = df[df["year"] <= corte]
+        test = df[df["year"] > corte]
+        if len(test) == 0 or len(train) == 0:
+            raise ValueError(
+                f"La división temporal con corte {corte} dejó un conjunto vacío "
+                f"(train={len(train)}, test={len(test)}). Ajuste anio_corte_test."
+            )
+        return train.reset_index(drop=True), test.reset_index(drop=True)
+
+    # División aleatoria (alternativa)
+    estratos = df[objetivo] if split["estratificar"] else None
     train, test = train_test_split(
         df,
-        test_size=params["split"]["test_size"],
+        test_size=split["test_size"],
         random_state=params["semilla"],
         stratify=estratos,
     )
