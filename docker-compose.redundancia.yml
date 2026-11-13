@@ -13,6 +13,7 @@ services:
     environment:
       MODEL_PATH: models/model.joblib
       DB_PATH: /tmp/a.db
+      RATE_LIMIT: "60/minute"
     volumes:
       - ./models:/app/models:ro
 
@@ -21,6 +22,7 @@ services:
     environment:
       MODEL_PATH: models/model.joblib
       DB_PATH: /tmp/b.db
+      RATE_LIMIT: "60/minute"
     volumes:
       - ./models:/app/models:ro
 

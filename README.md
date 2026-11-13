@@ -320,7 +320,7 @@ para evitar cobros.
 Automatiza pruebas y despliegue con **GitHub Actions**, monitorea el servicio,
 reentrena el modelo con control de calidad y aplica controles de seguridad.
 
-> **Dataset (enlace exacto de Kaggle):** `COMPLETAR_CON_LA_URL_EXACTA`
+> **Dataset (enlace exacto de Kaggle):** `https://www.kaggle.com/datasets/rajanand/crime-in-india`
 > Fuente oficial: **NCRB** (National Crime Records Bureau, Government of India).
 > El archivo fuente `data/external/crime_state_year.csv` se versiona con DVC
 > (`dvc add data/external/crime_state_year.csv`); no se sube a Git.
